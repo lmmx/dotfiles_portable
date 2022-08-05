@@ -1,0 +1,82 @@
+# Some of the functions below are aliases, before I found out on some random message board that elaborate aliases are actually bad
+
+for bashrc_funcs_file in ~/dotfiles/bashrc/bashrc_functions_*; do
+  source $bashrc_funcs_file;
+done
+
+# Small aliases and defaults
+# ==========================
+
+alias grepcol='grep --color=always'
+alias pygrep='grep -r --include \*.py'
+alias python='python3'
+alias pep8ify='autopep8 --in-place --aggressive --aggressive'
+alias jup-nb='jupyter-notebook'
+alias jup-debug='jupyter-notebook >> ~/Desktop/jup.log 2>> ~/Desktop/jup_err.log'
+alias weather="curl -4 http://wttr.in/London"
+alias ls='ls --color=auto'
+alias less='less -R'
+alias s='less -S'
+alias clip='xclip -sel clip'
+alias tsvshow="column -t -s $'\t'"
+alias tsvview='tsvshow | s'
+alias recent='ls -ht | head'
+alias recentsizes='du -h $(recent)'
+
+# Handy little helpers
+# ====================
+
+function extgrep () { grep -r --include \*.$1 "$2" ; }
+
+# named for ease of bash tab-autocompletion
+
+#function errecho	(){ >&2 echo "$@"; }
+#function cutf		(){ cut -d $'\t' -f "$@"; }
+#function cuts		(){ cut -d ' ' -f "$@"; }
+function findafile	(){ find / -iname "$@" 2>/dev/null; }
+function findit		(){ find ./ -iname "$@" 2>/dev/null; }
+function findext	(){ find ./ -type f -name "*.$@"; }
+function howbigis () { du -h "$@"; }
+function awkcols { awk -F "\t" '{print NF}' "$@"; }
+
+function mkcd() { mkdir "$@"; cd "$@"; }
+
+function rgreprecent() {
+  for dir in $(ls -dt ./*/); do
+    grepped=$(
+      cd $dir
+      >&2 echo "⇢ "$dir
+      grep -r "$@" | sed '/^Binary file/d'
+    )
+    if [[ ! -z $grepped ]]; then
+      echo "$grepped"
+    fi
+  done
+}
+
+function rlgreprecent() {
+  for dir in $(ls -dt ./*/); do
+    grepped=$(
+      cd $dir
+      >&2 echo "⇢ "$dir
+      grep -lr "$@" | sed '/^Binary file/d' | sed -e "s|^|$dir|"
+    )
+    if [[ ! -z $grepped ]]; then
+      echo "$grepped"
+    fi
+  done
+}
+
+function rgreprecentq () { rgreprecent "$@" 2>/dev/null; }
+function rlgreprecentq () { rlgreprecent "$@" 2>/dev/null; }
+function rlgreprecentqnoswap () { rlgreprecentq "$@" | sed '/.sw[p|o]$/d'; }
+
+function vimrgreprecent() {
+  matched_files=$(rlgreprecentqnoswap "$@" | uniq)
+  vim $matched_files
+}
+
+function viewrgreprecent() {
+  matched_files=$(rlgreprecentqnoswap "$@" | uniq)
+  view $matched_files
+}

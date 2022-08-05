@@ -1,0 +1,10 @@
+# Vim-related
+# ===========
+
+function vimsh()  {
+	vim -c "set syn=sh" "$@"
+}
+
+function viewsh()  {
+	view -c "set syn=sh" "$@"
+}

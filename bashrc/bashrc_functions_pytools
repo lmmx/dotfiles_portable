@@ -1,0 +1,180 @@
+# Python tool-related
+# ===========
+
+alias hiss="conda activate"
+alias dehiss="conda deactivate"
+alias runpc="pre-commit run --all-files"
+
+function flakeit() {
+	flake8 "$@" --max-line-length=88 --extend-ignore=E203,E722,E501,
+}
+
+function typecheckit() {
+	mypy "$@" --disable-error-code=import --show-error-codes
+}
+
+function srcd {
+	cd $(git rev-parse --show-toplevel) # gcd
+	guess_pkg="src/"$(cd src; dirname $(find ./ -iname "__init__.py" 2> /dev/null | head -1))
+	cd $guess_pkg
+}
+
+function runcov {
+	coverage run -m pytest
+	coverage combine
+	coverage report
+}
+
+# Create a new conda env with pip and the packages specified in a requirements.txt file
+function newconda_from_pipreqs {
+	if [ ! -f "$(pwd)/requirements.txt" ]; then
+		echo "conda create will not run (there's no requirements.txt in $(pwd))" >&2
+		if [ "$#" -ne 1 ]; then
+			echo "» » » Usage: 'newconda_from_pipreqs env_name', run from a directory containing a requirements.txt file" >&2
+		fi
+		return 1
+	fi
+	if [ "$#" -ne 1 ]; then
+		echo "» » » Usage: 'newconda_from_pipreqs env_name', run from a directory containing a requirements.txt file" >&2
+		if [ ! -f "$(pwd)/requirements.txt" ]; then
+			echo "» » » conda create will not run (there's no requirements.txt in $(pwd))" >&2
+		fi
+		return 1
+	fi
+	conda create -n "$@" pip $(cat requirements.txt | tr '\n' ' ');
+}
+
+# Create a new conda env with pip and the packages specified in a requirements.txt file
+function newconda38_from_pipreqs {
+	if [ ! -f "$(pwd)/requirements.txt" ]; then
+		echo "conda create will not run (there's no requirements.txt in $(pwd))" >&2
+		if [ "$#" -ne 1 ]; then
+			echo "» » » Usage: 'newconda_from_pipreqs env_name', run from a directory containing a requirements.txt file" >&2
+		fi
+		return 1
+	fi
+	if [ "$#" -ne 1 ]; then
+		echo "» » » Usage: 'newconda_from_pipreqs env_name', run from a directory containing a requirements.txt file" >&2
+		if [ ! -f "$(pwd)/requirements.txt" ]; then
+			echo "» » » conda create will not run (there's no requirements.txt in $(pwd))" >&2
+		fi
+		return 1
+	fi
+	conda create -n "$@" python=3.8 pip $(cat requirements.txt | tr '\n' ' ');
+}
+
+# Activate conda env based on the name of the parent git repo
+function proj_conda_activate {
+	if [ "$#" -ne 0 ]; then
+		echo "» » » Usage: 'proj_conda_activate', run from a git-versioned directory/subdirectory." >&2
+		return 1
+	fi
+	if [ -d $(pwd)/".git" ]; then
+		git_toplvl=$(pwd)
+	else
+		git_toplvl="$(git rev-parse --show-toplevel 2>&1 > /dev/null)"
+	fi
+	if [ $? -ne 0 ]; then
+		echo "Could not retrieve the parent git repo, make sure you're in a versioned directory." >&2
+		echo "Attempting to activate conda env based on working directory name..." >&2
+		proj_conda_activate_wd
+		return 1
+	fi
+	wd_dir=$(basename "$git_toplvl")
+	conda_env_matches=$(conda env list | grep "^$wd_dir\s")
+	conda_env_name=$(echo "$conda_env_matches" | rev | cut -d ' ' -f 1 | rev)
+	if [ $(echo "$conda_env_dir" | wc -l) -ne 1 ]; then
+		echo "There must be exactly one matching env listed by 'conda env list', cannot find one named $wd_dir" >&2
+		return 1
+	elif [ -d $conda_env_name ]; then
+		conda activate $conda_env_name
+		return 0
+	fi
+}
+
+
+# Activate conda env based on the working directory, or failing that look for a parent git repo and use its name
+function proj_conda_activate_wd {
+	if [ "$#" -ne 0 ]; then
+		echo "» » » Usage: 'proj_conda_activate_wd', run from a directory with the same name as the conda env"
+		return 1
+	fi
+	wd_dir=$(basename $(pwd))
+	conda_env_matches=$(conda env list | grep "^$wd_dir\s")
+	conda_env_name=$(echo "$conda_env_matches" | rev | cut -d ' ' -f 1 | rev)
+	if [ $(echo "$conda_env_dir" | wc -l) -ne 1 ]; then
+		echo "There must be exactly one matching env listed by 'conda env list', cannot find one named $wd_dir" >&2
+		return 1
+	elif [ -d $conda_env_name ]; then
+		conda activate $conda_env_name
+		return 0
+	else
+		echo "Cannot find the directory listed by 'conda env list' at $conda_env_dir" >&2
+		return 1
+	fi
+}
+
+alias mypycheck="mypy --cache-dir /dev/null"
+
+function pretag_gcd {
+	git_tld=$(git rev-parse --show-toplevel)
+	if [ $git_tld != $(pwd) ]; then
+		cd $git_tld
+	fi
+}
+
+function tag_new_release_micro() {
+	pretag_gcd
+	eval $(grep -E "^version =" version.py | tr -d " " | tr "." ",")
+	v_inc=$(python -c "v=[$version]; v[2]+=1; v=map(str,v); print('.'.join(v))") \
+	&& git tag -a "v$v_inc" -m "$@" \
+	&& git push origin "v$v_inc"
+}
+
+function tag_new_release_minor() {
+	pretag_gcd
+	eval $(grep -E "^version =" version.py | tr -d " " | tr "." ",")
+	v_inc=$(python -c "v=[$version]; v[1]+=1; v[2]=0; v=map(str,v); print('.'.join(v))") \
+	&& git tag -a "v$v_inc" -m "$@" \
+	&& git push origin "v$v_inc"
+}
+
+function tag_new_release_major() {
+	pretag_gcd
+	eval $(grep -E "^version =" version.py | tr -d " " | tr "." ",")
+	v_inc=$(python -c "v=[$version]; v[0]+=1; v[1]=v[2]=0; v=map(str,v); print('.'.join(v))") \
+	&& git tag -a "v$v_inc" -m "$@" \
+	&& git push origin "v$v_inc"
+}
+
+function pypi_republish {
+	EGG_INFO=$(find ./ -iname "*.egg-info")
+	if [ -d "$EGG_INFO" ]; then rm -rf "$EGG_INFO"; fi
+	rm -rf build/ dist/
+	if [ ! -z "${CONDA_DEFAULT_ENV+x}" ]; then
+		STORED_CONDA_ENV_NAME=$CONDA_DEFAULT_ENV
+		conda deactivate
+	fi
+	python3 setup.py sdist bdist_wheel
+	python3 -m twine upload dist/*
+	if [ ! -z "${STORED_CONDA_ENV_NAME+x}" ]; then
+		conda activate "$STORED_CONDA_ENV_NAME"
+		unset STORED_CONDA_ENV_NAME
+	fi
+}
+
+function retag_republish_micro() {
+	tag_new_release_micro "$@" && pypi_republish
+}
+
+function retag_republish_minor() {
+	tag_new_release_minor "$@" && pypi_republish
+}
+
+function retag_republish_major() {
+	tag_new_release_major "$@" && pypi_republish
+}
+
+function rpygrep() {
+	find . -type f -name '*.py' 2>/dev/null | xargs grep -En "$@"
+}

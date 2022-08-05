@@ -1,0 +1,44 @@
+function grepbashrc () {
+	cd ~/dotfiles/bashrc
+	bashrc_results=$(grep -ri "$@" ./* | sed '/Binary file .* matches/d')
+	if [[ -z $bashrc_results ]]; then
+		# TODO: use filenames in case that's what's being searched using
+		>&2 echo "No results in ~/dotfiles/bashrc/ for '$@'"
+		return
+	fi
+	#echo "$bashrc_results"
+	grepped_files=($(echo "$bashrc_results" | cut -d\: -f 1 | uniq))
+	if [ ${#grepped_files[@]} -eq 1 -a ! -z $grepped_files ]; then
+		vim -c "set syn=sh" "${grepped_files[0]}"
+		source ~/.bashrc
+		>&2 echo "Edited ${grepped_files[0]}, reloaded ~/.bashrc"
+		>&2 cd - > /dev/null
+		return
+	fi
+	>&2 echo "Matches in multiple files: select one to edit:"
+	gr_file_n=0
+	# remove this prefix from filenames, using a wildcard
+	gr_f_wc_pre="*bashrc_"
+	for grepped_file in ${grepped_files[@]}; do
+		gr_f_display_name=${grepped_file##$gr_f_wc_pre}
+		((gr_file_n++))
+		>&2 printf "  \e[1;94m$gr_file_n\e[0m $gr_f_display_name\n"
+	done
+	read chosen_filenum
+	while ! [ "$chosen_filenum" -gt 0 -a "$chosen_filenum" -le "$gr_file_n" ]; do
+		>&2 echo "$chosen_filenum isn't a valid option buddy."
+		>&2 printf "  Enter a number, 1-$gr_file_n:"
+		read chosen_filenum
+	done
+	((chosen_filenum--))
+	vim -c "set syn=sh" ${grepped_files[$chosen_filenum]}
+	source ~/.bashrc
+	# http://stackoverflow.com/questions/14259311/
+	# want to reset cursor back to after the line with something like
+	# tput cuu 1             # move cursor up 1 position
+	# nudgeup=`tput cuu 2`   # save it for later
+	# nudgeleft=`tput cub 2` 
+	# echo -n "           " $nudgeup "           hi" $nudgeleft "..."
+	>&2 echo "Edited ${grepped_files[$chosen_filenum]}, reloaded ~/.bashrc"
+	>&2 cd - > /dev/null
+}
